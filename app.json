@@ -1,0 +1,72 @@
+{
+  "expo": {
+    "name": "Gugu ABC",
+    "slug": "gugu-abc",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./assets/images/icon.png",
+    "scheme": "guguabc",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "com.guguabc.app",
+      "versionCode": 1,
+      "icon": "./assets/images/icon.png",
+      "adaptiveIcon": {
+        "backgroundColor": "#7EC8E3",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.guguabc.app",
+      "supportsTablet": true,
+      "icon": "./assets/images/icon.png"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#7EC8E3",
+          "image": "./assets/images/gugu-logo.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "LANDSCAPE"
+        }
+      ],
+      "expo-localization",
+      "expo-font",
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "36c17247-c106-4c2a-a36e-f676f0bc4b45"
+      }
+    },
+    "owner": "shanpk"
+  }
+}

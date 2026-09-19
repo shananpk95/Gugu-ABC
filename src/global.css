@@ -1,0 +1,26 @@
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
+@import 'tailwindcss/utilities.css';
+@import 'nativewind/theme';
+
+:root {
+  --font-display:
+    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
+    Segoe UI Symbol, Noto Color Emoji;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
+  --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
+  --font-serif: Georgia, 'Times New Roman', serif;
+}
+
+@theme {
+  --color-gugu-sky: #7ec8e3;
+  --color-gugu-yellow: #ffe08a;
+  --color-gugu-mint: #b7ebd0;
+  --color-gugu-coral: #ff8b7b;
+  --color-gugu-lavender: #d5c7f5;
+  --color-gugu-peach: #ffd3b6;
+  --color-gugu-cream: #fff8f0;
+  --color-gugu-ink: #2b3a4a;
+  --color-gugu-muted: #5d6d7e;
+}
