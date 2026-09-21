@@ -14,6 +14,7 @@ import { getPronunciationLetter, getPronunciationLetters } from '@/data/pronunci
 import { HomeBackground } from '@/features/home/HomeBackground';
 import { HomeSpace } from '@/features/home/homeLayout';
 import { audioManager } from '@/services/audio';
+import { pronunciationService } from '@/services/pronunciation';
 import type { PronunciationMode } from '@/types/pronunciation';
 
 const BOY_ASPECT = 1152 / 864;
@@ -64,7 +65,6 @@ export function PronunciationSession({ mode }: PronunciationSessionProps) {
   const [index, setIndex] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const letter = getPronunciationLetter(index);
-  const clip = mode === 'letter-name' ? letter.letterName : letter.phonicsSound;
   const bounce = useSharedValue(1);
 
   const padLeft = Math.max(insets.left, HomeSpace.md);
@@ -90,8 +90,12 @@ export function PronunciationSession({ mode }: PronunciationSessionProps) {
   const playClip = useCallback(() => {
     bounce.value = withSequence(withSpring(1.1, { damping: 8 }), withSpring(1));
     audioManager.playTap();
-    void audioManager.playPronunciation(clip);
-  }, [bounce, clip]);
+    if (mode === 'letter-name') {
+      void pronunciationService.playLetterName(letter.letter);
+      return;
+    }
+    void pronunciationService.playPhonics(letter.letter);
+  }, [bounce, letter.letter, mode]);
 
   useEffect(() => {
     void audioManager.init();
@@ -102,8 +106,12 @@ export function PronunciationSession({ mode }: PronunciationSessionProps) {
 
   useEffect(() => {
     bounce.value = 1;
-    void audioManager.playPronunciation(clip);
-  }, [bounce, clip, letter.id, mode]);
+    if (mode === 'letter-name') {
+      void pronunciationService.playLetterName(letter.letter);
+      return;
+    }
+    void pronunciationService.playPhonics(letter.letter);
+  }, [bounce, letter.letter, mode]);
 
   return (
     <View style={styles.root}>

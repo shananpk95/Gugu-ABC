@@ -7,6 +7,7 @@ import { GuguColors } from '@/constants/gugu';
 import { CategoryCarousel } from '@/features/home/CategoryCarousel';
 import { HomeBackground } from '@/features/home/HomeBackground';
 import { HomeCharacters } from '@/features/home/HomeCharacters';
+import { HomeMusicToggle } from '@/features/home/HomeMusicToggle';
 import { createHomeLayout, HomeSpace } from '@/features/home/homeLayout';
 
 export default function HomeScreen() {
@@ -18,6 +19,16 @@ export default function HomeScreen() {
     <View style={styles.root}>
       <HomeBackground />
       <HomeCharacters layout={layout} />
+
+      <View
+        style={{
+          position: 'absolute',
+          left: Math.max(insets.left, HomeSpace.md),
+          top: layout.padTop,
+          zIndex: 8,
+        }}>
+        <HomeMusicToggle size={Math.min(52, Math.max(44, height * 0.09))} />
+      </View>
 
       <View
         style={[

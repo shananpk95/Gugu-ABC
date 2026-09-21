@@ -47,28 +47,34 @@ export async function saveProgress(progress: ChildProgress): Promise<void> {
 
 export type AppSettings = {
   voiceEnabled: boolean;
+  musicEnabled: boolean;
 };
 
 const SETTINGS_KEY = 'gugu.settings';
 
 const EMPTY_SETTINGS: AppSettings = {
   voiceEnabled: true,
+  musicEnabled: true,
 };
 
 export async function getSettings(): Promise<AppSettings> {
   try {
     const raw = await AsyncStorage.getItem(SETTINGS_KEY);
     if (!raw) return { ...EMPTY_SETTINGS };
-    const parsed = JSON.parse(raw) as AppSettings;
-    return { voiceEnabled: parsed.voiceEnabled !== false };
+    const parsed = JSON.parse(raw) as Partial<AppSettings>;
+    return {
+      voiceEnabled: parsed.voiceEnabled !== false,
+      musicEnabled: parsed.musicEnabled !== false,
+    };
   } catch {
     return { ...EMPTY_SETTINGS };
   }
 }
 
-export async function saveSettings(settings: AppSettings): Promise<void> {
+export async function saveSettings(settings: Partial<AppSettings>): Promise<void> {
   try {
-    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    const current = await getSettings();
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...current, ...settings }));
   } catch {
     // Settings failure must not crash tracing.
   }

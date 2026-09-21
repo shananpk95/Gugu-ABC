@@ -1,14 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image } from 'expo-image';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SuccessCelebration } from '@/components/gugu/SuccessCelebration';
-import { GUGU_LETTER_TINTS } from '@/components/gugu/guguControls';
 import { GuguColors } from '@/constants/gugu';
+import { CollectBalloon } from '@/features/games/collectLetters/CollectBalloon';
 import { GameResultDialog } from '@/features/games/GameResultDialog';
 import { GameStatChip } from '@/features/games/GameStatChip';
 import { GameWorld } from '@/features/games/GameWorld';
@@ -16,7 +14,14 @@ import { ALPHABET } from '@/features/games/crackBalloon/round';
 import { HomeSpace } from '@/features/home/homeLayout';
 import { audioManager } from '@/services/audio';
 
-export const COLLECT_MAX_MIST = 2;
+const COLLECT_MAX_MIST = 2;
+
+/** Baskets: 6.75× original (4.5 × 1.5); clamped only so 3 stay on-screen. */
+const BASKET_SIZE_SCALE = 6.75;
+/** Basket letter sticker: 1.5× original Nunito size. */
+const BASKET_LETTER_SCALE = 1.5;
+/** Collectible balloons: 1.5× previous collectible size. */
+const COLLECT_BALLOON_SCALE = 1.5;
 
 type LetterToken = {
   id: string;
@@ -50,67 +55,19 @@ function balloonsForLevel(level: number): LetterToken[] {
   }));
 }
 
-type BasketLayout = { letter: string; x: number; y: number; width: number; height: number };
-
-type LetterBallProps = {
-  id: string;
+type BasketLayout = {
   letter: string;
-  color: string;
-  size: number;
-  homeX: number;
-  homeY: number;
-  collected: boolean;
-  disabled: boolean;
-  onDrop: (id: string, letter: string, centerX: number, centerY: number, reset: () => void) => void;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Collision matches visible basket art (sticker is on the art). */
+  hitX: number;
+  hitY: number;
+  hitW: number;
+  hitH: number;
+  hitPad: number;
 };
-
-function LetterBall({ id, letter, color, size, homeX, homeY, collected, disabled, onDrop }: LetterBallProps) {
-  const x = useSharedValue(0);
-  const y = useSharedValue(0);
-
-  useEffect(() => {
-    x.value = 0;
-    y.value = 0;
-  }, [homeX, homeY, id, x, y]);
-
-  const reset = () => {
-    x.value = withSpring(0);
-    y.value = withSpring(0);
-  };
-
-  const finish = (dx: number, dy: number) => {
-    onDrop(id, letter, homeX + dx + size / 2, homeY + dy + size / 2, reset);
-  };
-
-  const pan = Gesture.Pan()
-    .enabled(!collected && !disabled)
-    .onUpdate((event) => {
-      x.value = event.translationX;
-      y.value = event.translationY;
-    })
-    .onEnd((event) => {
-      runOnJS(finish)(event.translationX, event.translationY);
-    });
-
-  const style = useAnimatedStyle(() => ({
-    zIndex: 12,
-    transform: [{ translateX: x.value }, { translateY: y.value }],
-  }));
-
-  if (collected) {
-    return null;
-  }
-
-  return (
-    <GestureDetector gesture={pan}>
-      <Animated.View style={[styles.ballWrap, { left: homeX, top: homeY, width: size, height: size * 1.18 }, style]}>
-        <View style={[styles.ball, { backgroundColor: color, borderRadius: size / 2 }]}>
-          <Text style={[styles.ballLetter, { fontSize: Math.round(size * 0.42) }]}>{letter}</Text>
-        </View>
-      </Animated.View>
-    </GestureDetector>
-  );
-}
 
 export function CollectLettersGame() {
   const router = useRouter();
@@ -127,6 +84,7 @@ export function CollectLettersGame() {
   const [baskets, setBaskets] = useState<string[]>(() => shuffle(lettersForLevel(0)));
   const [balls, setBalls] = useState<LetterToken[]>(() => balloonsForLevel(0));
   const [busy, setBusy] = useState(false);
+  const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const padLeft = Math.max(insets.left, HomeSpace.md);
   const padRight = Math.max(insets.right, HomeSpace.md);
@@ -137,17 +95,39 @@ export function CollectLettersGame() {
 
   const count = Math.max(1, balls.length);
   const cols = Math.min(6, Math.max(3, count));
-  const ballSize = Math.min(54, Math.max(40, Math.min(playSize.width / (cols + 1.6), compact ? 44 : 54)));
-  const basketW = Math.min(150, Math.max(96, playSize.width * 0.22));
-  const basketH = Math.min(128, Math.max(88, playSize.height * 0.34));
+  const originalBallSize = Math.min(54, Math.max(40, Math.min(playSize.width / (cols + 1.6), compact ? 44 : 54)));
+  const ballSize = originalBallSize * COLLECT_BALLOON_SCALE;
+  const balloonVisualH = ballSize * 1.22 + Math.max(12, Math.round(ballSize * 0.28)) + 8;
+
+  const originalLabelSize = compact ? 18 : 22;
+  const labelSize = Math.round(originalLabelSize * BASKET_LETTER_SCALE);
+  const stickerPad = Math.max(6, Math.round(labelSize * 0.28));
+  const stickerSize = labelSize + stickerPad * 2;
+  const countH = 16;
+
+  const originalBasketW = Math.min(150, Math.max(96, playSize.width * 0.22));
+  const originalBasketH = Math.min(128, Math.max(88, playSize.height * 0.34));
+  const desiredBasketW = originalBasketW * BASKET_SIZE_SCALE;
+  const desiredBasketH = originalBasketH * BASKET_SIZE_SCALE;
+
+  // Fit 3 baskets on screen while targeting 6.75×.
+  const minGap = 6;
+  const maxBasketW = playSize.width > 0 ? (playSize.width - minGap * 4) / 3 : desiredBasketW;
+  const minFallSpace = Math.max(balloonVisualH + 16, playSize.height * 0.22);
+  const maxBasketH =
+    playSize.height > 0 ? Math.max(48, playSize.height - countH - minFallSpace - 4) : desiredBasketH;
+  const fitScale = Math.min(1, maxBasketW / Math.max(1, desiredBasketW), maxBasketH / Math.max(1, desiredBasketH));
+  const basketW = desiredBasketW * fitScale;
+  const basketH = desiredBasketH * fitScale;
+  const hitPad = 16 * BASKET_SIZE_SCALE * fitScale;
 
   const ballHomes = useMemo(() => {
     if (!playSize.width) return [];
     const columns = Math.min(6, Math.max(3, balls.length));
     const rows = Math.ceil(balls.length / columns);
     const cellW = playSize.width / columns;
-    const topArea = Math.max(ballSize + 12, playSize.height - basketH - 28);
-    const cellH = Math.min(ballSize + 16, topArea / rows);
+    const topArea = Math.max(balloonVisualH + 12, playSize.height - basketH - countH - 28);
+    const cellH = Math.min(balloonVisualH + 12, topArea / rows);
     return balls.map((ball, index) => {
       const col = index % columns;
       const row = Math.floor(index / columns);
@@ -157,29 +137,45 @@ export function CollectLettersGame() {
         y: 8 + row * cellH,
       };
     });
-  }, [ballSize, balls, basketH, playSize.height, playSize.width]);
+  }, [ballSize, balls, balloonVisualH, basketH, countH, playSize.height, playSize.width]);
 
   const basketLayouts = useMemo((): BasketLayout[] => {
     if (!playSize.width || !playSize.height) return [];
     const gap = (playSize.width - basketW * 3) / 4;
-    const top = playSize.height - basketH - 4;
-    return baskets.map((letter, index) => ({
-      letter,
-      x: gap + index * (basketW + gap),
-      y: top,
-      width: basketW,
-      height: basketH,
-    }));
-  }, [basketH, basketW, baskets, playSize.height, playSize.width]);
+    const artTop = playSize.height - basketH - countH - 4;
+    return baskets.map((letter, index) => {
+      const x = gap + index * (basketW + gap);
+      return {
+        letter,
+        x,
+        y: artTop,
+        width: basketW,
+        height: basketH + countH,
+        hitX: x,
+        hitY: artTop,
+        hitW: basketW,
+        hitH: basketH,
+        hitPad,
+      };
+    });
+  }, [basketH, basketW, baskets, countH, hitPad, playSize.height, playSize.width]);
 
   useEffect(() => {
     void audioManager.init();
     return () => {
+      if (completeTimerRef.current) {
+        clearTimeout(completeTimerRef.current);
+        completeTimerRef.current = null;
+      }
       audioManager.stop();
     };
   }, []);
 
   const loadLevel = useCallback((nextLevel: number, keepScore = true) => {
+    if (completeTimerRef.current) {
+      clearTimeout(completeTimerRef.current);
+      completeTimerRef.current = null;
+    }
     const letters = lettersForLevel(nextLevel);
     setLevel(nextLevel);
     setMist(0);
@@ -198,10 +194,10 @@ export function CollectLettersGame() {
   const hitBasket = (cx: number, cy: number) => {
     return basketLayouts.find(
       (basket) =>
-        cx >= basket.x - 16 &&
-        cx <= basket.x + basket.width + 16 &&
-        cy >= basket.y - 16 &&
-        cy <= basket.y + basket.height + 16,
+        cx >= basket.hitX - basket.hitPad &&
+        cx <= basket.hitX + basket.hitW + basket.hitPad &&
+        cy >= basket.hitY - basket.hitPad &&
+        cy <= basket.hitY + basket.hitH + basket.hitPad,
     );
   };
 
@@ -217,16 +213,19 @@ export function CollectLettersGame() {
     }
     if (basket.letter === letter) {
       audioManager.playSuccess();
-      setCollected((value) => {
-        const next = [...value, id];
-        if (next.length >= balls.length) {
-          setBusy(true);
-          setCelebrateKey((key) => key + 1);
-          setTimeout(() => setComplete(true), 420);
-        }
-        return next;
-      });
+      const willComplete = collected.length + 1 >= balls.length;
+      setCollected((value) => [...value, id]);
       setScore((value) => value + 1);
+      if (willComplete) {
+        setBusy(true);
+        setCelebrateKey((key) => key + 1);
+        audioManager.playLevelUp();
+        if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
+        completeTimerRef.current = setTimeout(() => {
+          completeTimerRef.current = null;
+          setComplete(true);
+        }, 420);
+      }
       return;
     }
 
@@ -291,8 +290,32 @@ export function CollectLettersGame() {
           <View
             key={`basket-${basket.letter}`}
             style={[styles.basketWrap, { left: basket.x, top: basket.y, width: basket.width, height: basket.height }]}>
-            <Text style={[styles.basketLabel, { fontSize: compact ? 18 : 22 }]}>{basket.letter}</Text>
-            <Image source={require('@/assets/images/game-basket.png')} style={styles.basketArt} contentFit="contain" />
+            <View style={[styles.basketArtWrap, { height: basketH }]}>
+              <Image
+                source={require('@/assets/images/game-basket.png')}
+                style={styles.basketArt}
+                contentFit="contain"
+              />
+              {/* Sticker centered on the woven front wall (below green rim). */}
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.letterSticker,
+                  {
+                    width: stickerSize,
+                    height: stickerSize,
+                    borderRadius: stickerSize * 0.28,
+                    // Front-wall band sits roughly mid-lower on the basket art.
+                    top: basketH * 0.52 - stickerSize / 2,
+                    left: (basket.width - stickerSize) / 2,
+                    transform: [{ scaleY: 0.94 }],
+                  },
+                ]}>
+                <Text style={[styles.stickerLetter, { fontSize: labelSize, lineHeight: labelSize + 2 }]}>
+                  {basket.letter}
+                </Text>
+              </View>
+            </View>
             <Text style={styles.basketCount}>
               {collectedFor(basket.letter)}/{totalFor(basket.letter)}
             </Text>
@@ -300,11 +323,11 @@ export function CollectLettersGame() {
         ))}
 
         {ballHomes.map((home, index) => (
-          <LetterBall
+          <CollectBalloon
             key={home.id}
             id={home.id}
             letter={home.letter}
-            color={GUGU_LETTER_TINTS[index % GUGU_LETTER_TINTS.length]}
+            colorIndex={index}
             size={ballSize}
             homeX={home.x}
             homeY={home.y}
@@ -364,38 +387,40 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
   },
-  basketLabel: {
-    fontFamily: 'Nunito_800ExtraBold',
-    fontWeight: '800',
-    color: GuguColors.ink,
-    marginBottom: 2,
+  basketArtWrap: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
   },
   basketArt: {
     width: '100%',
-    flex: 1,
+    height: '100%',
+  },
+  letterSticker: {
+    position: 'absolute',
+    zIndex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFDF8',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.98)',
+    // Soft contact shadow — reads as stuck on, not floating above.
+    shadowColor: '#2B3A4A',
+    shadowOpacity: 0.12,
+    shadowRadius: 1.5,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  stickerLetter: {
+    fontFamily: 'Nunito_800ExtraBold',
+    fontWeight: '800',
+    color: GuguColors.ink,
+    textAlign: 'center',
   },
   basketCount: {
     fontFamily: 'Nunito_700Bold',
     fontSize: 12,
     color: GuguColors.ink,
     marginTop: -4,
-  },
-  ballWrap: {
-    position: 'absolute',
-  },
-  ball: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#2B3A4A',
-    shadowOpacity: 0.22,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 8,
-  },
-  ballLetter: {
-    fontFamily: 'Nunito_800ExtraBold',
-    fontWeight: '800',
-    color: GuguColors.ink,
   },
 });

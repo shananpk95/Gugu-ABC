@@ -8,6 +8,7 @@ node_modules/
 dist/
 build/
 web-build/
+.tmp-export-*/
 expo-env.d.ts
 
 # Native
@@ -55,6 +56,12 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+scripts/.tts-cache/
+scripts/.tts-probe/
+scripts/.phoneme-cache/
+scripts/.sapi-probe/
+scripts/.sapi-phonemes/
+scripts/.spec/
 
 example
 

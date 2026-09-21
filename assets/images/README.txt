@@ -1,4 +1,4 @@
-GUGU ABC HOME ASSETS
+Play & Learn ABC — home image assets
 
 Use the files in assets/images/ in the React Native project.
 

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Gugu ABC",
+    "name": "Play & Learn ABC",
     "slug": "gugu-abc",
     "version": "1.0.0",
     "orientation": "landscape",
@@ -23,7 +23,10 @@
     "ios": {
       "bundleIdentifier": "com.guguabc.app",
       "supportsTablet": true,
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "infoPlist": {
+        "CFBundleDisplayName": "Play & Learn ABC"
+      }
     },
     "web": {
       "output": "static",
@@ -56,7 +59,17 @@
       ],
       "expo-localization",
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "enableBundleCompression": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

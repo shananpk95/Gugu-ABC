@@ -4,6 +4,12 @@ export const GuguColors = {
   sky: '#7EC8E3',
   yellow: '#FFE08A',
   mint: '#B7EBD0',
+  /** Balloon letter face — rgb(132,184,157) */
+  green: '#84B89D',
+  greenMid: '#51856A',
+  greenDark: '#1E5237',
+  greenDeep: '#001C08',
+  greenInk: '#000602',
   coral: '#FF8B7B',
   lavender: '#D5C7F5',
   peach: '#FFD3B6',
@@ -73,15 +79,6 @@ export const LEARN_SECTIONS = [
   'Phonics',
   'Vocabulary',
   'Reading',
-] as const;
-
-export const PRACTICE_SECTIONS = [
-  'Trace Letters',
-  'Draw & Color',
-  'Listening',
-  'Speaking',
-  'Word Building',
-  'Spelling',
 ] as const;
 
 export const GAME_SECTIONS = [

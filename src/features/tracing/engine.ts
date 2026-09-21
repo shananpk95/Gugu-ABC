@@ -3,11 +3,14 @@ import type { TraceLetter, TracePoint, TraceStroke } from '@/types/tracing';
 export const PATH_TOLERANCE = 12;
 export const DOT_TOLERANCE = 14;
 export const START_RADIUS = 12;
+export const RESUME_RADIUS = 20;
 export const END_RADIUS = 14;
 export const MAX_FINGER_JUMP = 22;
 export const BACKWARD_SLACK = 8;
 export const COMPLETION_RATIO = 0.9;
 export const SAMPLE_SPACING = 2.4;
+/** Progress above this is treated as pauseable mid-stroke (resume from here). */
+export const RESUME_PROGRESS = 0.02;
 
 export type StrokeRuntime = {
   stroke: TraceStroke;
@@ -202,6 +205,29 @@ export function beginTrace(state: TracingEngineState, point: TracePoint): Tracin
     return next;
   }
 
+  // Mid-stroke pause/resume: keep progress; rejoin near the last completed point.
+  if (active.progress > RESUME_PROGRESS) {
+    const resumeAt = pointAtLength(active.samples, active.progress * active.length);
+    const projection = projectOnPath(active.samples, point);
+    const currentS = active.progress * active.length;
+    const nearResume = distance(point, resumeAt) <= RESUME_RADIUS;
+    const nearPath =
+      projection.dist <= PATH_TOLERANCE + 4 &&
+      Math.abs(projection.s - currentS) <= RESUME_RADIUS * 1.6;
+
+    if (!nearResume && !nearPath) {
+      next.hint = 'Continue from where you stopped';
+      return next;
+    }
+
+    applyProgress(active, active.progress);
+    next.gestureActive = true;
+    next.catchingUp = true;
+    next.lastFinger = point;
+    next.hint = null;
+    return next;
+  }
+
   const start = active.samples[0];
   if (distance(point, start) > START_RADIUS) {
     next.hint = 'Start at the first dot';
@@ -210,7 +236,7 @@ export function beginTrace(state: TracingEngineState, point: TracePoint): Tracin
 
   applyProgress(active, active.progress);
   next.gestureActive = true;
-  next.catchingUp = active.progress > 0.02;
+  next.catchingUp = false;
   next.lastFinger = point;
   next.hint = null;
   return next;
@@ -273,6 +299,7 @@ export function moveTrace(state: TracingEngineState, point: TracePoint): Tracing
 export function endTrace(state: TracingEngineState): TracingEngineState {
   if (state.letterComplete) return state;
   const next = cloneState(state);
+  // Finger lift = pause. Keep strokeIndex, progress, and completed fills.
   next.gestureActive = false;
   next.catchingUp = false;
   next.lastFinger = null;
@@ -280,6 +307,8 @@ export function endTrace(state: TracingEngineState): TracingEngineState {
   if (!active || active.complete || active.stroke.kind === 'dot') return next;
   if (canComplete(active)) {
     completeStroke(next, active);
+  } else if (next.hint === 'Start at the first dot') {
+    next.hint = null;
   }
   return next;
 }
@@ -369,21 +398,6 @@ export function samplesForProgress(samples: TracePoint[], progress: number): Tra
     output.push(samples[i]);
   }
   return output;
-}
-
-export function spacedPathDots(samples: TracePoint[], gap = 20): TracePoint[] {
-  if (samples.length === 0) return [];
-  const tip = arrowTip(samples);
-  const dots: TracePoint[] = [];
-  let last: TracePoint | null = null;
-  for (const point of samples) {
-    if (tip && distance(point, tip) < 9) continue;
-    if (!last || distance(point, last) >= gap) {
-      dots.push(point);
-      last = point;
-    }
-  }
-  return dots;
 }
 
 export function remainingGuideDots(samples: TracePoint[], progress: number, complete: boolean, gap = 18): TracePoint[] {

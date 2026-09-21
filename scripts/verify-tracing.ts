@@ -122,4 +122,25 @@ assert(state.strokes.every((stroke) => stroke.complete), 'test9 all strokes');
 state = createEngineState(f);
 assert(state.strokeIndex === 0 && state.strokes.every((stroke) => stroke.progress === 0), 'test10');
 
+// TEST 11: lift mid-stroke then resume from progress (not first dot)
+state = createEngineState(f);
+state = beginTrace(state, along(state, 0, 0));
+state = drag(state, 0, 0, 0.45, 18);
+const paused = state.strokes[0].progress;
+assert(paused > 0.3, `test11 paused ${paused}`);
+state = endTrace(state);
+assert(!state.gestureActive, 'test11 pause');
+assert(Math.abs(state.strokes[0].progress - paused) < 0.001, 'test11 progress kept');
+// Touching first dot again must NOT reset — should ask to continue / not activate from start
+const afterWrongStart = beginTrace(state, along(state, 0, 0));
+assert(afterWrongStart.strokes[0].progress === paused, 'test11 no reset on first-dot touch');
+assert(!afterWrongStart.gestureActive, 'test11 not restarting at first dot');
+// Resume near paused point
+state = beginTrace(state, along(state, 0, paused));
+assert(state.gestureActive, 'test11 resume active');
+assert(Math.abs(state.strokes[0].progress - paused) < 0.02, `test11 resume progress ${state.strokes[0].progress}`);
+state = drag(state, 0, paused, 1, 24);
+state = endTrace(state);
+assert(state.strokes[0].complete, 'test11 finish after resume');
+
 console.log('tracing engine tests passed');

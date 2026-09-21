@@ -12,7 +12,6 @@ import { BackButton } from '@/components/gugu/BackButton';
 import { GuguIconButton } from '@/components/gugu/GuguIconButton';
 import { GUGU_MEADOW } from '@/components/gugu/guguControls';
 import { GuguColors } from '@/constants/gugu';
-import { getPronunciationByLetter } from '@/data/pronunciation';
 import { getWordItem, getWordItems } from '@/data/words';
 import { HomeBackground } from '@/features/home/HomeBackground';
 import { HomeSpace } from '@/features/home/homeLayout';
@@ -86,8 +85,7 @@ export function WordSession() {
 
   const playPhrase = useCallback(() => {
     bounce.value = withSequence(withSpring(1.06, { damping: 8 }), withSpring(1));
-    const letterSpeak = getPronunciationByLetter(item.letter).letterName.speakText;
-    void audioManager.playWordPhrase(letterSpeak, item.word);
+    void audioManager.playWordPhrase(item.letter, item.word);
   }, [bounce, item.letter, item.word]);
 
   useEffect(() => {
@@ -99,8 +97,7 @@ export function WordSession() {
 
   useEffect(() => {
     bounce.value = 1;
-    const letterSpeak = getPronunciationByLetter(item.letter).letterName.speakText;
-    void audioManager.playWordPhrase(letterSpeak, item.word);
+    void audioManager.playWordPhrase(item.letter, item.word);
   }, [bounce, item.letter, item.word]);
 
   return (

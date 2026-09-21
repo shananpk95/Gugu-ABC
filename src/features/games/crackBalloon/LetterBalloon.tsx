@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
+  cancelAnimation,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
@@ -63,6 +64,9 @@ export function LetterBalloon({
       -1,
       false,
     );
+    return () => {
+      cancelAnimation(float);
+    };
   }, [colorIndex, float]);
 
   useEffect(() => {

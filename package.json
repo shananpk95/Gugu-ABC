@@ -8,6 +8,7 @@
     "expo": "~57.0.24",
     "expo-asset": "~57.0.18",
     "expo-audio": "~57.0.5",
+    "expo-build-properties": "~57.0.21",
     "expo-constants": "~57.0.19",
     "expo-font": "~57.0.4",
     "expo-image": "~57.0.5",
@@ -18,8 +19,6 @@
     "expo-screen-orientation": "~57.0.2",
     "expo-speech": "~57.0.3",
     "expo-splash-screen": "~57.0.9",
-    "expo-status-bar": "~57.0.1",
-    "expo-system-ui": "~57.0.4",
     "nativewind": "5.0.0-rc.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -50,7 +49,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "generate:assets": "node ./scripts/generate-assets.js"
+    "generate:assets": "node ./scripts/generate-assets.js",
+    "optimize:assets": "python ./scripts/optimize-production-assets.py"
   },
   "private": true,
   "overrides": {

@@ -15,6 +15,7 @@ import { GUGU_LOGO_ASPECT, GUGU_LOGO_SOURCE } from '@/components/branding/GuguLo
 import AppTabs from '@/components/app-tabs';
 import { GuguColors } from '@/constants/gugu';
 import { audioManager } from '@/services/audio';
+import { backgroundMusic } from '@/services/backgroundMusic';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -56,6 +57,11 @@ export default function RootLayout() {
     void audioManager.init();
     void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    void audioManager.init().then(() => backgroundMusic.start());
+  }, [ready]);
 
   useEffect(() => {
     if (ready) {

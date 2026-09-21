@@ -1,6 +1,5 @@
 export const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 export const MAX_BALLOONS = 10;
-export const MAX_MISSES = 1;
 
 export type BalloonItem = {
   id: string;

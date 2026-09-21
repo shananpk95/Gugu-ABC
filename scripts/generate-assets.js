@@ -203,7 +203,7 @@ writeWav(path.join(musicDir, 'background.wav'), backgroundMusic());
 fs.writeFileSync(
   path.join(root, 'assets', 'audio', 'README.md'),
   [
-    '# Gugu ABC audio',
+    '# Play & Learn ABC audio',
     '',
     'Voice pronunciation uses the device English TTS (`en-US`) through the centralized audio manager.',
     'Bundled WAV files are original generated music and sound effects.',
@@ -212,4 +212,4 @@ fs.writeFileSync(
   ].join('\n'),
 );
 
-console.log('Generated Gugu ABC images and audio.');
+console.log('Generated Play & Learn ABC images and audio.');

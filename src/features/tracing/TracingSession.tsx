@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image } from 'expo-image';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,6 +54,21 @@ function ResetGlyph({ size }: { size: number }) {
   );
 }
 
+function PrevGlyph({ size }: { size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d="M14.8 5.2 7.4 12 14.8 18.8"
+        stroke={GuguColors.ink}
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  );
+}
+
 function NextGlyph({ size }: { size: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
@@ -77,7 +92,6 @@ export function TracingSession({ letterCase }: TracingSessionProps) {
   const [index, setIndex] = useState(0);
   const [resetToken, setResetToken] = useState(0);
   const [completed, setCompleted] = useState(false);
-  const [hint, setHint] = useState<string | null>(null);
   const [showDemo, setShowDemo] = useState(true);
   const [voiceOn, setVoiceOn] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -86,6 +100,7 @@ export function TracingSession({ letterCase }: TracingSessionProps) {
   const bounce = useSharedValue(1);
   const lastHint = useRef<string | null>(null);
   const celebrateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const celebratedRef = useRef(false);
 
   const padLeft = Math.max(insets.left, HomeSpace.md);
   const padRight = Math.max(insets.right, HomeSpace.md);
@@ -105,6 +120,7 @@ export function TracingSession({ letterCase }: TracingSessionProps) {
   const boardAvailH = height - padTop - padBottom;
   const boardWidth = Math.min(boardAvailW * 0.98, boardAvailH * BOARD_ASPECT);
   const boardHeight = Math.min(boardAvailH, boardWidth / BOARD_ASPECT);
+  const canGoPrev = index > 0;
 
   const bounceStyle = useAnimatedStyle(() => ({
     transform: [{ scale: bounce.value }],
@@ -114,17 +130,25 @@ export function TracingSession({ letterCase }: TracingSessionProps) {
     void audioManager.init().then(() => setVoiceOn(audioManager.isVoiceEnabled()));
     return () => {
       audioManager.stop();
-      if (celebrateTimer.current) {
-        clearTimeout(celebrateTimer.current);
-      }
+      if (celebrateTimer.current) clearTimeout(celebrateTimer.current);
     };
   }, []);
 
+  const clearCelebrateTimers = () => {
+    if (celebrateTimer.current) {
+      clearTimeout(celebrateTimer.current);
+      celebrateTimer.current = null;
+    }
+    audioManager.cancelDrawCompletion();
+  };
+
   const loadLetter = useCallback(
     (nextIndex: number) => {
+      clearCelebrateTimers();
+      celebratedRef.current = false;
+      setCelebrateKey(0);
       setIndex(nextIndex);
       setCompleted(false);
-      setHint(null);
       setShowDemo(true);
       lastHint.current = null;
       bounce.value = 1;
@@ -134,7 +158,7 @@ export function TracingSession({ letterCase }: TracingSessionProps) {
   );
 
   const onHint = useCallback((value: string | null) => {
-    setHint(value);
+    // Soft retry cue only — no on-board instruction text.
     if (value === 'Try again 😊' && lastHint.current !== value) {
       audioManager.playRetry();
     }
@@ -142,27 +166,32 @@ export function TracingSession({ letterCase }: TracingSessionProps) {
   }, []);
 
   const onLetterComplete = useCallback(() => {
+    if (celebratedRef.current) return;
+    celebratedRef.current = true;
     setCompleted(true);
     setShowDemo(false);
-    bounce.value = withSequence(withSpring(1.08, { damping: 8 }), withSpring(1));
-    audioManager.playSuccess();
+    bounce.value = withSequence(withSpring(1.1, { damping: 7 }), withSpring(1));
+    setCelebrateKey((value) => value + 1);
     void markTracingComplete(letterCase, letter.character);
-    void audioManager.playPraise(letter.character);
-    if (celebrateTimer.current) {
-      clearTimeout(celebrateTimer.current);
-    }
-    celebrateTimer.current = setTimeout(() => {
-      setCelebrateKey((value) => value + 1);
-    }, 320);
+    clearCelebrateTimers();
+    void audioManager.playDrawCompletion(letter.character);
   }, [bounce, letter.character, letterCase]);
 
   const resetTrace = () => {
+    clearCelebrateTimers();
+    celebratedRef.current = false;
+    setCelebrateKey(0);
     setCompleted(false);
-    setHint(null);
     setShowDemo(true);
     lastHint.current = null;
     bounce.value = 1;
     setResetToken((value) => value + 1);
+  };
+
+  const goPrev = () => {
+    if (!canGoPrev) return;
+    loadLetter(index - 1);
+    audioManager.playTap();
   };
 
   const goNext = () => {
@@ -211,9 +240,6 @@ export function TracingSession({ letterCase }: TracingSessionProps) {
                         onStrokeActivated={() => setShowDemo(true)}
                       />
                     </View>
-                    {hint || completed ? (
-                      <Text style={styles.hint}>{completed ? 'Great job!' : hint}</Text>
-                    ) : null}
                   </View>
 
                   <View style={styles.controlRail}>
@@ -225,6 +251,13 @@ export function TracingSession({ letterCase }: TracingSessionProps) {
                     </GuguIconButton>
                     <GuguIconButton size={controlSize} onPress={resetTrace} accessibilityLabel="Reset Trace">
                       <ResetGlyph size={glyph} />
+                    </GuguIconButton>
+                    <GuguIconButton
+                      size={controlSize}
+                      onPress={goPrev}
+                      disabled={!canGoPrev}
+                      accessibilityLabel="Previous Letter">
+                      <PrevGlyph size={glyph} />
                     </GuguIconButton>
                     <GuguIconButton size={controlSize} onPress={goNext} accessibilityLabel="Next Letter">
                       <NextGlyph size={glyph} />
@@ -272,9 +305,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
   },
-  left: {
-    overflow: 'hidden',
-  },
+  left: {},
   boyStage: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -285,16 +316,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  hint: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    bottom: 8,
-    textAlign: 'center',
-    fontSize: 13,
-    fontWeight: '800',
-    color: GuguColors.ink,
   },
   boardWrap: {
     flex: 1,
@@ -337,6 +358,7 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     paddingLeft: 22,
     paddingRight: 16,
+    overflow: 'hidden',
   },
   controlRail: {
     width: 62,

@@ -22,7 +22,7 @@ export function GuguLogo({ size = 'medium' }: GuguLogoProps) {
       source={GUGU_LOGO_SOURCE}
       style={[styles.logo, { width, height: width * GUGU_LOGO_ASPECT }]}
       contentFit="contain"
-      accessibilityLabel="GuGu"
+      accessibilityLabel="Play & Learn ABC"
     />
   );
 }
